@@ -1,16 +1,20 @@
 #!/usr/bin/env python
 # coding: utf-8
+import os
 import datetime
+
+import paddle.metric
 from paddlets.models.forecasting.ml.ml_model_wrapper import make_ml_model
 
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.ensemble import GradientBoostingRegressor
-# from xgboost import XGBRegressor
+from paddlets.models.forecasting import RNNBlockRegressor
 
 import pandas as pd
 from paddlets import TSDataset
 from sklearn.metrics import mean_squared_error
+import paddle
 
 sunshine = pd.read_csv("../data/sunshine.csv")
 print("sunshine", sunshine.describe())
@@ -29,7 +33,7 @@ assert sunshine.shape[0]/15 == wind.shape[0]/24 - 10
 
 
 def dh2dt(_d, _h, _p=False):
-    _r = datetime.datetime.strptime(f"2000-01-01 {_h-1}:00:00", "%Y-%m-%d %H:%M:%S") + datetime.timedelta(days=_d)
+    _r = datetime.datetime.strptime(f"2000-01-01 {int(_h)-1}:00:00", "%Y-%m-%d %H:%M:%S") + datetime.timedelta(days=_d)
     if _p:
         print("dh2dt", _r)
     return _r 
@@ -50,12 +54,15 @@ for _d in range(2):
 
 data = pd.merge(wind, temp, on=["Day", "Hour"], how="left")
 data = pd.merge(data, sunshine, on=["Day", "Hour"], how="left")
-data.fillna(-999999, inplace=True)
+data["Day"] = data["Day"].apply(float)
+data["Hour"] = data["Hour"].apply(float)
+print(f'Radiation mean: {data["Radiation"].mean():.6f}')
+data.fillna(data["Radiation"].mean(), inplace=True)
 data["dt"] = [
-    datetime.datetime.strptime(f"2000-01-01 {_h-1}:00:00", "%Y-%m-%d %H:%M:%S") + datetime.timedelta(days=_d)
+    dh2dt(_d, _h)
     for _d, _h in zip(data["Day"], data["Hour"])
 ]
-data["para-A"] = 2
+data["para-A"] = 2.0
 data["para-n"] = 0.5
 print(data)
 
@@ -79,13 +86,24 @@ train_ds, testa_ds = data_ds.split(
 )
 print(train_ds, testa_ds)
 
-model = make_ml_model(
+# model = make_ml_model(
+#     in_chunk_len=7,
+#     out_chunk_len=1,
+#     model_class=RandomForestRegressor,
+#     model_init_params={"max_depth": 10, "n_estimators": 200, "random_state": 10086},
+# )
+# model.fit(train_data=train_ds)
+model = RNNBlockRegressor(
     in_chunk_len=7,
     out_chunk_len=1,
-    model_class=RandomForestRegressor,
-    model_init_params={"max_depth": 10, "n_estimators": 200, "random_state": 10086},
+    # rnn_type_or_module="LSTM",
+    dropout=0.5,
+    max_epochs=100,
+    # patience=1,
+    loss_fn=paddle.nn.functional.mse_loss,
+    seed=10086,
 )
-model.fit(train_data=train_ds)
+model.fit(train_tsdataset=train_ds)
 
 train_pr = model.recursive_predict(
     tsdataset=train_ds, 
@@ -104,3 +122,5 @@ _result["_h"] = [dt2dh(i)[1] for i in _result.index]
 _result = _result[(_result["_d"] >= 300) & (_result["_h"] >= 6) & (_result["_h"] <= 20)]
 _result["Radiation"].to_csv("result.csv", index=False)
 print(_result)
+
+os.system("say 'i finished the job.'")
