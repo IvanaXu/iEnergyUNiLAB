@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 import datetime
-from paddlets.datasets.repository import get_dataset
 from paddlets.models.forecasting.ml.ml_model_wrapper import make_ml_model
+
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import GradientBoostingRegressor
+# from xgboost import XGBRegressor
 
 import pandas as pd
 from paddlets import TSDataset
@@ -78,9 +80,10 @@ train_ds, testa_ds = data_ds.split(
 print(train_ds, testa_ds)
 
 model = make_ml_model(
-    in_chunk_len=3,
+    in_chunk_len=7,
     out_chunk_len=1,
-    model_class=RandomForestRegressor
+    model_class=RandomForestRegressor,
+    model_init_params={"max_depth": 10, "n_estimators": 200, "random_state": 10086},
 )
 model.fit(train_data=train_ds)
 
@@ -99,5 +102,5 @@ _result = train_pr.to_dataframe()
 _result["_d"] = [dt2dh(i)[0] for i in _result.index]
 _result["_h"] = [dt2dh(i)[1] for i in _result.index]
 _result = _result[(_result["_d"] >= 300) & (_result["_h"] >= 6) & (_result["_h"] <= 20)]
-_result.to_csv("result.csv", index=False)
+_result["Radiation"].to_csv("result.csv", index=False)
 print(_result)
