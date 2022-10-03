@@ -51,7 +51,7 @@ data["Hour"] = data["Hour"].apply(float)
 data["is_Hour"] = data["Hour"].apply(lambda x: 1.0 if 6 <= x <= 20 else 0.0)
 print(f'Radiation mean: {data["Radiation"].mean():.6f}')
 
-NNN = -0.123456
+NNN = -0.000001
 data.fillna(NNN, inplace=True)
 data["dt"] = [
     dh2dt(_d, _h)
@@ -72,7 +72,7 @@ data_ds = TSDataset.load_from_dataframe(
 
     # max, min, avg, median, pre, back, zero
     # fill_missing_dates=True,
-    # fillna_method='max' 
+    # fillna_method='max',
 )
 print(data_ds)
 
@@ -84,9 +84,9 @@ print(train_ds, testa_ds)
 model = RNNBlockRegressor(
     in_chunk_len=7,
     out_chunk_len=1,
-    rnn_type_or_module="LSTM",
-    dropout=0.1,
-    max_epochs=200,
+    # rnn_type_or_module="LSTM",
+    # dropout=0.1,
+    max_epochs=1000,
     patience=20,
     loss_fn=paddle.nn.functional.mse_loss,
     eval_metrics=['mse'],
@@ -99,7 +99,7 @@ train_pr = model.recursive_predict(
     predict_length=20 * 24
 )
 
-_1 = data_ds.to_dataframe().tail(20*24).head(10*24)["Radiation"].to_numpy()
+_1 = testa_ds.to_dataframe().head(10*24)["Radiation"].to_numpy()
 _2 = train_pr.to_numpy()[:, 0][:10*24]
 _1_cut = [_1[_k] for _k, _v in enumerate(_1) if _v != NNN]
 _2_cut = [_2[_k] for _k, _v in enumerate(_1) if _v != NNN]
@@ -115,4 +115,4 @@ _result = _result[(_result["_d"] >= 300) & (_result["_h"] >= 6) & (_result["_h"]
 _result["Radiation"].to_csv("result.csv", index=False)
 print(_result)
 
-# os.system("say 'i finished the job'")
+os.system("say 'i finished the job'")
