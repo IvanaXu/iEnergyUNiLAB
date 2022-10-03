@@ -6,8 +6,7 @@ import datetime
 import pandas as pd
 from paddlets import TSDataset
 from sklearn.metrics import mean_squared_error
-from paddlets.models.forecasting import DeepARModel
-
+from paddlets.models.forecasting import RNNBlockRegressor
 
 sunshine = pd.read_csv("../data/sunshine.csv")
 print("sunshine", sunshine.describe())
@@ -49,9 +48,10 @@ data = pd.merge(wind, temp, on=["Day", "Hour"], how="left")
 data = pd.merge(data, sunshine, on=["Day", "Hour"], how="left")
 data["Day"] = data["Day"].apply(float)
 data["Hour"] = data["Hour"].apply(float)
+data["is_Hour"] = data["Hour"].apply(lambda x: 1.0 if 6 <= x <= 20 else 0.0)
 print(f'Radiation mean: {data["Radiation"].mean():.6f}')
 
-NNN = 999999
+NNN = -0.123456
 data.fillna(NNN, inplace=True)
 data["dt"] = [
     dh2dt(_d, _h)
@@ -66,9 +66,13 @@ data_ds = TSDataset.load_from_dataframe(
     data,
     time_col='dt',
     target_cols='Radiation',
-    known_cov_cols=['Day', 'Hour', 'Dir', 'Spd', 'Temp'],
+    known_cov_cols=['Day', 'Hour', 'is_Hour', 'Dir', 'Spd', 'Temp'],
     static_cov_cols=["para-A", "para-n"],
     freq='1h',
+
+    # max, min, avg, median, pre, back, zero
+    # fill_missing_dates=True,
+    # fillna_method='max' 
 )
 print(data_ds)
 
@@ -77,21 +81,18 @@ train_ds, testa_ds = data_ds.split(
 )
 print(train_ds, testa_ds)
 
-model = DeepARModel(
-    in_chunk_len=7 * 24,
-    out_chunk_len=24,
-    sampling_stride=24,
-    max_epochs=100,
-    optimizer_params=dict(learning_rate=1e-3),
-    batch_size=32,
+model = RNNBlockRegressor(
+    in_chunk_len=7,
+    out_chunk_len=1,
+    rnn_type_or_module="LSTM",
+    dropout=0.1,
+    max_epochs=200,
     patience=20,
-    num_samples=101,
-    regression_mode="sampling",
-    output_mode="quantiles",
-    # loss_fn=paddle.nn.functional.mse_loss,
+    loss_fn=paddle.nn.functional.mse_loss,
+    eval_metrics=['mse'],
     seed=10086,
- )
-model.fit(train_tsdataset=train_ds)
+)
+model.fit(train_tsdataset=train_ds, valid_tsdataset=testa_ds)
 
 train_pr = model.recursive_predict(
     tsdataset=train_ds, 
@@ -114,4 +115,4 @@ _result = _result[(_result["_d"] >= 300) & (_result["_h"] >= 6) & (_result["_h"]
 _result["Radiation"].to_csv("result.csv", index=False)
 print(_result)
 
-# os.system("say 'i finished the job.'")
+# os.system("say 'i finished the job'")
