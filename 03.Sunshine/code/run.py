@@ -49,10 +49,14 @@ data = pd.merge(data, sunshine, on=["Day", "Hour"], how="left")
 data["Day"] = data["Day"].apply(float)
 data["Hour"] = data["Hour"].apply(float)
 data["is_Hour"] = data["Hour"].apply(lambda x: 1.0 if 6 <= x <= 20 else 0.0)
-print(f'Radiation mean: {data["Radiation"].mean():.6f}')
 
-NNN = -0.000001
-data.fillna(NNN, inplace=True)
+NNN = 0.25
+print(f'Radiation mean: {NNN}')
+data["Radiation"] = data["Radiation"].fillna(NNN)
+
+for icol in data.columns:
+    data[icol] = data[icol].fillna(data[icol].mean())
+# data.fillna(-999999, inplace=True)
 data["dt"] = [
     dh2dt(_d, _h)
     for _d, _h in zip(data["Day"], data["Hour"])
@@ -84,9 +88,9 @@ print(train_ds, testa_ds)
 model = RNNBlockRegressor(
     in_chunk_len=7,
     out_chunk_len=1,
-    # rnn_type_or_module="LSTM",
-    # dropout=0.1,
-    max_epochs=1000,
+    rnn_type_or_module="LSTM",
+    dropout=0.1,
+    max_epochs=200,
     patience=20,
     loss_fn=paddle.nn.functional.mse_loss,
     eval_metrics=['mse'],
@@ -111,8 +115,9 @@ print(f"MSE {len(_1)}: {mean_squared_error(_1, _2):.4f}\n"
 _result = train_pr.to_dataframe()
 _result["_d"] = [dt2dh(i)[0] for i in _result.index]
 _result["_h"] = [dt2dh(i)[1] for i in _result.index]
+# print(_result)
 _result = _result[(_result["_d"] >= 300) & (_result["_h"] >= 6) & (_result["_h"] <= 20)]
 _result["Radiation"].to_csv("result.csv", index=False)
-print(_result)
+# print(_result)
 
-os.system("say 'i finished the job'")
+# os.system("say 'i finished the job'")
