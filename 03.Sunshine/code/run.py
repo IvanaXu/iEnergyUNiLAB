@@ -86,12 +86,12 @@ train_ds, testa_ds = data_ds.split(
 print(train_ds, testa_ds)
 
 model = RNNBlockRegressor(
-    in_chunk_len=7,
-    out_chunk_len=1,
+    in_chunk_len=10*24,
+    out_chunk_len=10*24,
     rnn_type_or_module="LSTM",
     dropout=0.1,
     max_epochs=200,
-    patience=20,
+    patience=10,
     loss_fn=paddle.nn.functional.mse_loss,
     eval_metrics=['mse'],
     seed=10086,
@@ -120,4 +120,4 @@ _result = _result[(_result["_d"] >= 300) & (_result["_h"] >= 6) & (_result["_h"]
 _result["Radiation"].to_csv("result.csv", index=False)
 # print(_result)
 
-# os.system("say 'i finished the job'")
+os.system("say 'i finished the job'")
