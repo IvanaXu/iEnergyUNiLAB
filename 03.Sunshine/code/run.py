@@ -86,12 +86,12 @@ train_ds, testa_ds = data_ds.split(
 print(train_ds, testa_ds)
 
 model = RNNBlockRegressor(
-    in_chunk_len=7,
+    in_chunk_len=14,
     out_chunk_len=1,
-    # rnn_type_or_module="LSTM",
+    rnn_type_or_module="LSTM",
     dropout=0.5,
     max_epochs=200,
-    patience=20,
+    patience=10,
     loss_fn=paddle.nn.functional.mse_loss,
     eval_metrics=['mse'],
     seed=10086,
