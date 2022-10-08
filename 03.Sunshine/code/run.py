@@ -86,7 +86,7 @@ train_ds, testa_ds = data_ds.split(
 print(train_ds, testa_ds)
 
 model = RNNBlockRegressor(
-    in_chunk_len=3,
+    in_chunk_len=9,
     out_chunk_len=1,
     # rnn_type_or_module="LSTM",
     dropout=0.5,
@@ -111,6 +111,8 @@ assert len(_1) == len(_2)
 assert len(_1_cut) == len(_2_cut)
 print(f"MSE {len(_1)}: {mean_squared_error(_1, _2):.4f}\n"
       f"MSE {len(_1_cut)}: {mean_squared_error(_1_cut, _2_cut):.4f}")
+# if mean_squared_error(_1, _2) < 0.0216:
+#     os.system("say 'i got the goal'")
 
 _result = train_pr.to_dataframe()
 _result["_d"] = [dt2dh(i)[0] for i in _result.index]
@@ -120,4 +122,4 @@ _result = _result[(_result["_d"] >= 300) & (_result["_h"] >= 6) & (_result["_h"]
 _result["Radiation"].to_csv("result.csv", index=False)
 # print(_result)
 
-os.system("say 'i finished the job'")
+# os.system("say 'i finished the job'")
