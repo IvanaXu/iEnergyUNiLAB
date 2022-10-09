@@ -1,12 +1,11 @@
-#!/usr/bin/env python
-# coding: utf-8
-import os
+import time
 import paddle
 import datetime
 import pandas as pd
 from paddlets import TSDataset
 from sklearn.metrics import mean_squared_error
 from paddlets.models.forecasting import RNNBlockRegressor
+from tqdm import tqdm
 
 sunshine = pd.read_csv("../data/sunshine.csv")
 print("sunshine", sunshine.describe())
@@ -28,7 +27,7 @@ def dh2dt(_d, _h, _p=False):
     _r = datetime.datetime.strptime(f"2000-01-01 {int(_h)-1}:00:00", "%Y-%m-%d %H:%M:%S") + datetime.timedelta(days=_d)
     if _p:
         print("dh2dt", _r)
-    return _r
+    return _r 
 
 
 def dt2dh(_dt, _p=False):
@@ -85,41 +84,51 @@ train_ds, testa_ds = data_ds.split(
 )
 print(train_ds, testa_ds)
 
-model = RNNBlockRegressor(
-    in_chunk_len=7,
-    out_chunk_len=1,
-    rnn_type_or_module="LSTM",
-    dropout=0.1,
-    max_epochs=200,
-    patience=10,
-    loss_fn=paddle.nn.functional.mse_loss,
-    eval_metrics=['mse'],
-    seed=10086,
-)
-model.fit(train_tsdataset=train_ds, valid_tsdataset=testa_ds)
 
-train_pr = model.recursive_predict(
-    tsdataset=train_ds,
-    predict_length=20 * 24
-)
+def run(in_chunk_len, max_epochs):
+    time.sleep(1)
+    
+    model = RNNBlockRegressor(
+        in_chunk_len=in_chunk_len,
+        out_chunk_len=1,
+        # rnn_type_or_module="LSTM",
+        dropout=0.1,
+        max_epochs=max_epochs,
+        patience=max_epochs//10,
+        loss_fn=paddle.nn.functional.mse_loss,
+        eval_metrics=['mse'],
+        seed=10086,
+        verbose=1,
+        batch_size=32,
+    )
+    model.fit(train_tsdataset=train_ds, valid_tsdataset=testa_ds)
 
-_1 = testa_ds.to_dataframe().head(10*24)["Radiation"].to_numpy()
-_2 = train_pr.to_numpy()[:, 0][:10*24]
-_1_cut = [_1[_k] for _k, _v in enumerate(_1) if _v != NNN]
-_2_cut = [_2[_k] for _k, _v in enumerate(_1) if _v != NNN]
-assert len(_1) == len(_2)
-assert len(_1_cut) == len(_2_cut)
-print(f"MSE {len(_1)}: {mean_squared_error(_1, _2):.4f}\n"
-      f"MSE {len(_1_cut)}: {mean_squared_error(_1_cut, _2_cut):.4f}")
-# if mean_squared_error(_1, _2) < 0.0216:
-#     os.system("say 'i got the goal'")
+    train_pr = model.recursive_predict(
+        tsdataset=train_ds, 
+        predict_length=20 * 24
+    )
 
-_result = train_pr.to_dataframe()
-_result["_d"] = [dt2dh(i)[0] for i in _result.index]
-_result["_h"] = [dt2dh(i)[1] for i in _result.index]
-# print(_result)
-_result = _result[(_result["_d"] >= 300) & (_result["_h"] >= 6) & (_result["_h"] <= 20)]
-_result["Radiation"].to_csv("result.csv", index=False)
-# print(_result)
+    _1 = testa_ds.to_dataframe().head(10*24)["Radiation"].to_numpy()
+    _2 = train_pr.to_numpy()[:, 0][:10*24]
+    _1_cut = [_1[_k] for _k, _v in enumerate(_1) if _v != NNN]
+    _2_cut = [_2[_k] for _k, _v in enumerate(_1) if _v != NNN]
+    assert len(_1) == len(_2)
+    assert len(_1_cut) == len(_2_cut)
+    mse = mean_squared_error(_1, _2)
+    print(f"MSE {len(_1)}: {mse:.4f}\n"
+        f"MSE {len(_1_cut)}: {mean_squared_error(_1_cut, _2_cut):.4f}")
+    
+    _result = train_pr.to_dataframe()
+    _result["_d"] = [dt2dh(i)[0] for i in _result.index]
+    _result["_h"] = [dt2dh(i)[1] for i in _result.index]
+    _result = _result[(_result["_d"] >= 300) & (_result["_h"] >= 6) & (_result["_h"] <= 20)]
+    _result["Radiation"].to_csv(f"./save/result-{mse:.6f}.csv", index=False)
+    return mse
 
-# os.system("say 'i finished the job'")
+for para1 in tqdm(range(1, 24)):
+    for para2 in [100, 200, 400]:
+        for _ in range(3):
+            mse = run(in_chunk_len=para1, max_epochs=para2)
+
+            with open("./save/round_run.log", "a+") as f:
+                f.write(f"{para1} {para2}, {mse}\n")
