@@ -130,5 +130,5 @@ for para1 in tqdm(range(1, 24)):
         for _ in range(3):
             mse = run(in_chunk_len=para1, max_epochs=para2)
 
-            with open("save/result-0.016847.csv.log", "a+") as f:
+            with open("save/result-0.016847000000.csv.log", "a+") as f:
                 f.write(f"{para1} {para2}, {mse}\n")
